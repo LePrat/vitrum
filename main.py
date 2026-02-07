@@ -9,11 +9,9 @@ TRANSPARENCY = 70
 class ToolbarWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.resize(700, 500)
-
         self._drag_pos = QPoint()
         self._is_fullscreen = False
         self._transparency = TRANSPARENCY
@@ -48,9 +46,9 @@ class ToolbarWindow(QMainWindow):
         """)
 
         # Standard App Actions (Left side)
-        self.toolbar.addAction("File")
-        self.toolbar.addAction("Edit")
-        self.toolbar.addAction("View")
+        self.toolbar.addAction("Save")
+        self.toolbar.addAction("Load")
+        self.toolbar.addAction("Shapes")
 
         # The Spacer: This pushes everything after it to the right
         spacer = QWidget()
@@ -60,7 +58,6 @@ class ToolbarWindow(QMainWindow):
         # Window Controls (Right side)
         self.full_btn = QPushButton("⛶")
         self.close_btn = QPushButton("✕")
-
         for btn in [self.full_btn, self.close_btn]:
             btn.setFixedSize(32, 28)
             btn.setStyleSheet("""
@@ -69,10 +66,8 @@ class ToolbarWindow(QMainWindow):
                 }
                 QPushButton:hover { background: rgba(255, 255, 255, 40); }
             """)
-
         # Specific hover for close button
         self.close_btn.setStyleSheet(self.close_btn.styleSheet() + "QPushButton:hover { background: #e81123; }")
-
         self.full_btn.clicked.connect(self.toggle_fullscreen)
         self.close_btn.clicked.connect(self.close)
 
