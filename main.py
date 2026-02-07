@@ -2,7 +2,6 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy)
-from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, QPoint
 
 TRANSPARENCY = 70
@@ -104,17 +103,20 @@ class ToolbarWindow(QMainWindow):
 
     # Dragging Logic (still needed on the whole window or toolbar)
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and not self._is_fullscreen:
-            # We check if the click was in the toolbar area to allow dragging
-            if self.toolbar.rect().contains(event.position().toPoint()):
+        # Only start the drag if we click inside the toolbar
+        if self.toolbar.rect().contains(event.position().toPoint()):
+            if event.button() == Qt.MouseButton.LeftButton and not self._is_fullscreen:
                 self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
                 event.accept()
+        else:
+            # If we click the body, we don't set _drag_pos, so mouseMoveEvent won't move it
+            self._drag_pos = None
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton and not self._is_fullscreen:
-            if hasattr(self, '_drag_pos'):
-                self.move(event.globalPosition().toPoint() - self._drag_pos)
-                event.accept()
+        # Only move if _drag_pos was successfully set in mousePressEvent
+        if self._drag_pos and event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
