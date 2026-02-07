@@ -1,105 +1,128 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
-                               QHBoxLayout, QVBoxLayout, QWidget, QSizeGrip)
+                               QVBoxLayout, QWidget, QSizeGrip,
+                               QToolBar, QSizePolicy)
+from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, QPoint
 
+TRANSPARENCY = 70
 
-class ModernTransparentWindow(QMainWindow):
+class ToolbarWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(500, 400)
+        self.resize(700, 500)
 
         self._drag_pos = QPoint()
         self._is_fullscreen = False
+        self._transparency = TRANSPARENCY
 
-        # --- UI Setup ---
-        self.central_widget = QWidget()
-        self.central_widget.setObjectName("MainContainer")
-        self.central_widget.setStyleSheet("""
-            QWidget#MainContainer {
-                background-color: rgba(30, 30, 30, 220);
-                border-radius: 15px;
-                border: 1px solid rgba(255, 255, 255, 30);
-            }
+        # --- Main Container ---
+        self.container = QWidget()
+        self.container.setObjectName("MainContainer")
+        self.container.setStyleSheet(f"""
+            QWidget#MainContainer {{
+                background-color: rgba(30, 30, 30, {self._transparency});
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 40);
+            }}
         """)
-        self.setCentralWidget(self.central_widget)
+        self.setCentralWidget(self.container)
+        self.layout = QVBoxLayout(self.container)
+        self.layout.setContentsMargins(0, 0, 0, 0)  # Toolbar should touch the edges
 
-        # Main Layout
-        self.main_layout = QVBoxLayout(self.central_widget)
+        # --- 1. The Unified ToolBar ---
+        self.toolbar = QToolBar()
+        self.toolbar.setMovable(False)  # Keep it locked at the top
+        self.toolbar.setStyleSheet("""
+            QToolBar {
+                background: rgba(255, 255, 255, 15);
+                border-bottom: 1px solid rgba(255, 255, 255, 20);
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
+                padding: 4px;
+            }
+            QToolButton { color: white; padding: 5px; font-weight: bold; }
+            QToolButton:hover { background: rgba(255, 255, 255, 30); border-radius: 4px; }
+        """)
 
-        # Header bar for buttons
-        self.header_layout = QHBoxLayout()
+        # Standard App Actions (Left side)
+        self.toolbar.addAction("File")
+        self.toolbar.addAction("Edit")
+        self.toolbar.addAction("View")
 
-        # Fullscreen Button
-        self.full_btn = QPushButton("⛶")  # Square symbol
-        self.full_btn.setFixedSize(30, 30)
+        # The Spacer: This pushes everything after it to the right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.toolbar.addWidget(spacer)
+
+        # Window Controls (Right side)
+        self.full_btn = QPushButton("⛶")
+        self.close_btn = QPushButton("✕")
+
+        for btn in [self.full_btn, self.close_btn]:
+            btn.setFixedSize(32, 28)
+            btn.setStyleSheet("""
+                QPushButton { 
+                    background: transparent; color: white; border-radius: 4px; font-size: 14px;
+                }
+                QPushButton:hover { background: rgba(255, 255, 255, 40); }
+            """)
+
+        # Specific hover for close button
+        self.close_btn.setStyleSheet(self.close_btn.styleSheet() + "QPushButton:hover { background: #e81123; }")
+
         self.full_btn.clicked.connect(self.toggle_fullscreen)
-
-        # Close Button
-        self.close_btn = QPushButton("×")
-        self.close_btn.setFixedSize(30, 30)
         self.close_btn.clicked.connect(self.close)
 
-        # Style for both buttons
-        button_style = """
-            QPushButton {
-                background-color: rgba(255, 255, 255, 20);
-                color: white;
-                border-radius: 5px;
-                font-size: 16px;
-            }
-            QPushButton:hover { background-color: rgba(255, 255, 255, 40); }
-        """
-        self.full_btn.setStyleSheet(button_style)
-        self.close_btn.setStyleSheet(button_style + "QPushButton:hover { background-color: #e81123; }")
+        self.toolbar.addWidget(self.full_btn)
+        self.toolbar.addWidget(self.close_btn)
 
-        self.header_layout.addStretch()  # Push buttons to the right
-        self.header_layout.addWidget(self.full_btn)
-        self.header_layout.addWidget(self.close_btn)
+        # Add toolbar to the top of our layout
+        self.layout.addWidget(self.toolbar)
+        self.layout.addStretch()  # Content area
 
-        self.main_layout.addLayout(self.header_layout)
-        self.main_layout.addStretch()  # Push content to top
-
-        # Resize Handle
         self.sizegrip = QSizeGrip(self)
 
     def toggle_fullscreen(self):
         if not self._is_fullscreen:
             self.showFullScreen()
-            self.full_btn.setText("❐")  # Change icon to "restore"
-            self.central_widget.setStyleSheet(
-                "QWidget#MainContainer { border-radius: 0px; background-color: rgba(30, 30, 30, 220); }")
-            self.sizegrip.hide()  # Hide resize handle in fullscreen
+            self.container.setStyleSheet(
+                f"QWidget#MainContainer {{ border-radius: 0px; background-color: rgb(30, 30, 30, {self._transparency}); }}")
+            self.toolbar.setStyleSheet(
+                self.toolbar.styleSheet().replace("border-top-left-radius: 12px; border-top-right-radius: 12px;", ""))
         else:
             self.showNormal()
-            self.full_btn.setText("⛶")
-            self.central_widget.setStyleSheet(
-                "QWidget#MainContainer { border-radius: 15px; background-color: rgba(30, 30, 30, 220); }")
-            self.sizegrip.show()
+            self.container.setStyleSheet(
+                f"QWidget#MainContainer {{ border-radius: 12px; background-color: rgba(30, 30, 30, {self._transparency}); }}")
+            self.toolbar.setStyleSheet(
+                self.toolbar.styleSheet() + "QToolBar { border-top-left-radius: 12px; border-top-right-radius: 12px; }")
 
         self._is_fullscreen = not self._is_fullscreen
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        rect = self.rect()
-        self.sizegrip.move(rect.right() - 20, rect.bottom() - 20)
-
+    # Dragging Logic (still needed on the whole window or toolbar)
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and not self._is_fullscreen:
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+            # We check if the click was in the toolbar area to allow dragging
+            if self.toolbar.rect().contains(event.position().toPoint()):
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton and not self._is_fullscreen:
-            self.move(event.globalPosition().toPoint() - self._drag_pos)
-            event.accept()
+            if hasattr(self, '_drag_pos'):
+                self.move(event.globalPosition().toPoint() - self._drag_pos)
+                event.accept()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizegrip.move(self.width() - 20, self.height() - 20)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ModernTransparentWindow()
+    window = ToolbarWindow()
     window.show()
     sys.exit(app.exec())
