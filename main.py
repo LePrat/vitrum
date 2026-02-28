@@ -1,13 +1,13 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy)
+                               QToolBar, QSizePolicy, QComboBox, QSpinBox)
 from PySide6.QtCore import Qt
 
 
 # --- Configuration & Styles ---
 class UIStyles:
-    TRANSPARENCY = 70  # Increased for better visibility, adjust as needed
+    TRANSPARENCY = 70
     BG_COLOR = f"rgba(30, 30, 30, {TRANSPARENCY})"
     RADIUS = "12px"
 
@@ -20,15 +20,51 @@ class UIStyles:
     """
 
     TOOLBAR = f"""
-        QToolBar {{
-            background: rgba(255, 255, 255, 15);
-            border-bottom: 1px solid rgba(255, 255, 255, 20);
-            border-top-left-radius: {RADIUS};
-            border-top-right-radius: {RADIUS};
-            padding: 4px;
-        }}
-        QToolButton {{ color: white; padding: 5px; font-weight: bold; }}
-        QToolButton:hover {{ background: rgba(255, 255, 255, 30); border-radius: 4px; }}
+    QToolBar {{
+        background: rgba(255, 255, 255, 15);
+        border-bottom: 1px solid rgba(255, 255, 255, 20);
+        border-top-left-radius: {RADIUS};
+        border-top-right-radius: {RADIUS};
+        padding: 4px;
+    }}
+    
+    QToolBar > QWidget {{
+        height: 24px;
+        max-height: 24px;
+        min-height: 24px;
+    }}
+    
+    QToolButton {{ 
+        color: white; 
+        padding: 5px; 
+        font-weight: bold; 
+    }}
+    
+    QToolButton:hover {{ 
+        background: rgba(255, 255, 255, 30); 
+        border-radius: 4px; 
+    }}
+    """
+
+    OPACITY_TOOL = """
+        QSpinBox {
+            background: rgba(255, 255, 255, 20);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 30);
+            border-radius: 4px;
+            padding: 2px;
+        }
+    """
+
+    MODE_SELECT = """
+        QComboBox { 
+            background: rgba(255, 255, 255, 20); 
+            color: white; 
+            border: 1px solid rgba(255, 255, 255, 30);
+            border-radius: 4px;
+            padding: 2px 10px;
+        }
+        QComboBox QAbstractItemView { background-color: #2b2b2b; color: white; }
     """
 
 
@@ -38,18 +74,31 @@ class CustomTitleBar(QToolBar):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.mode_select = None
+        self.opacity_spin = None
         self.btn_close = None
         self.btn_full = None
-        self.parent_window = parent
+        self.parent_window: ModernWindow = parent
         self.setMovable(False)
         self.setStyleSheet(UIStyles.TOOLBAR)
         self.init_ui()
 
     def init_ui(self):
         # 1. Left Side Actions
-        self.addAction("Save")
-        self.addAction("Load")
-        self.addAction("Shapes")
+        self.opacity_spin = QSpinBox()
+        self.opacity_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.opacity_spin.setRange(0, 100)
+        self.opacity_spin.setSuffix("%")
+        self.opacity_spin.setValue(70)
+        self.opacity_spin.setStyleSheet(UIStyles.OPACITY_TOOL)
+        self.opacity_spin.valueChanged.connect(self.update_background_opacity)
+        self.addWidget(self.opacity_spin)
+
+        self.mode_select = QComboBox()
+        self.mode_select.addItems(["Circle", "Line"])
+        self.mode_select.setStyleSheet(UIStyles.MODE_SELECT)
+        self.addSeparator()
+        self.addWidget(self.mode_select)
 
         # 2. Spacer
         spacer = QWidget()
@@ -62,6 +111,21 @@ class CustomTitleBar(QToolBar):
 
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
+
+    def update_background_opacity(self, value):
+        """
+        Updates only the alpha channel of the background
+        while preserving the rest of the UI design.
+        """
+        alpha = int(value * 255 / 100)
+        new_style = f"""
+            QWidget#MainContainer {{
+                background-color: rgba(30, 30, 30, {alpha});
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 40);
+            }}
+        """
+        self.parent_window.main_container.setStyleSheet(new_style)
 
     @staticmethod
     def _create_btn(text, callback, is_close=False):
@@ -83,7 +147,7 @@ class ModernWindow(QMainWindow):
         self.sizegrip = None
         self.content_area = None
         self.title_bar = None
-        self.main_layout = None
+        self.main_layout: QVBoxLayout = None
         self.main_container = None
         self._is_fullscreen = False
         self._drag_pos = None
