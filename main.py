@@ -1,8 +1,10 @@
 import sys
+
+from PySide6.QtGui import QPainter, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy, QComboBox, QSpinBox)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
 
 
 # --- Configuration & Styles ---
@@ -140,15 +142,28 @@ class CustomTitleBar(QToolBar):
         return btn
 
 
+class DrawingArea(QWidget):
+    def __init__(self):
+        super().__init__()
+
+    def paintEvent(self, event):
+        # The painter must be initialized inside paintEvent
+        painter = QPainter(self)
+
+        # Draw the rectangle
+        rect = QRectF(10, 20, 80, 60)
+        painter.drawRect(rect)
+
 # --- Main Window ---
 class ModernWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.painter = None
         self.sizegrip = None
         self.content_area = None
         self.title_bar = None
         self.main_layout: QVBoxLayout = None
-        self.main_container = None
+        self.main_container: QWidget = None
         self._is_fullscreen = False
         self._drag_pos = None
 
@@ -179,6 +194,9 @@ class ModernWindow(QMainWindow):
         self.main_layout.addWidget(self.content_area, stretch=1)
 
         self.sizegrip = QSizeGrip(self)
+
+        self.content_area = DrawingArea()
+        self.main_layout.addWidget(self.content_area, stretch=1)
 
     def toggle_fullscreen(self):
         if not self._is_fullscreen:
