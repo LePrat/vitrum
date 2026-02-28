@@ -1,10 +1,10 @@
 import sys
 
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy, QComboBox, QSpinBox)
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QPoint, QRect
 
 
 # --- Configuration & Styles ---
@@ -145,14 +145,42 @@ class CustomTitleBar(QToolBar):
 class DrawingArea(QWidget):
     def __init__(self):
         super().__init__()
+        self.start_point = QPoint()
+        self.end_point = QPoint()
+        self.is_drawing = False
+
+    def mousePressEvent(self, event):
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.start_point = event.position().toPoint()
+            self.end_point = self.start_point
+            self.is_drawing = True
+            self.update()  # Triggers a repaint
+
+    def mouseMoveEvent(self, event):
+        if self.is_drawing:
+            self.end_point = event.position().toPoint()
+            self.update()  # Redraws the "preview" as you drag
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.end_point = event.position().toPoint()
+            self.is_drawing = False
+            self.update()
 
     def paintEvent(self, event):
-        # The painter must be initialized inside paintEvent
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Draw the rectangle
-        rect = QRectF(10, 20, 80, 60)
-        painter.drawRect(rect)
+        # Style the circle
+        pen = QPen(QColor(0, 0, 0), 2)
+        painter.setPen(pen)
+        painter.setBrush(QColor(255, 255, 255, 0))  # Semi-transparent white
+
+        if not self.start_point.isNull() and not self.end_point.isNull():
+            # Define the bounding box for the ellipse
+            rect = QRect(self.start_point, self.end_point)
+            painter.drawEllipse(rect)
 
 # --- Main Window ---
 class ModernWindow(QMainWindow):
@@ -191,7 +219,6 @@ class ModernWindow(QMainWindow):
         self.main_layout.addWidget(self.title_bar)
 
         self.content_area = QWidget()
-        self.main_layout.addWidget(self.content_area, stretch=1)
 
         self.sizegrip = QSizeGrip(self)
 
