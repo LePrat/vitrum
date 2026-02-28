@@ -23,7 +23,7 @@ class UIStyles:
 
     TOOLBAR = f"""
     QToolBar {{
-        background: rgba(255, 255, 255, 15);
+        background: rgba(255, 255, 255, 70);
         border-bottom: 1px solid rgba(255, 255, 255, 20);
         border-top-left-radius: {RADIUS};
         border-top-right-radius: {RADIUS};
@@ -50,7 +50,7 @@ class UIStyles:
 
     OPACITY_TOOL = """
         QSpinBox {
-            background: rgba(255, 255, 255, 20);
+            background: rgba(0, 0, 0, 100);
             color: white;
             border: 1px solid rgba(255, 255, 255, 30);
             border-radius: 4px;
@@ -60,7 +60,7 @@ class UIStyles:
 
     MODE_SELECT = """
         QComboBox { 
-            background: rgba(255, 255, 255, 20); 
+            background: rgba(0, 0, 0, 100); 
             color: white; 
             border: 1px solid rgba(255, 255, 255, 30);
             border-radius: 4px;
