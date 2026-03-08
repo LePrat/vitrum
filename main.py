@@ -1,10 +1,11 @@
+import math
 import sys
 
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy, QComboBox, QSpinBox)
-from PySide6.QtCore import Qt, QRectF, QPoint, QRect
+from PySide6.QtCore import Qt, QPoint, QRect
 
 
 # --- Configuration & Styles ---
@@ -119,6 +120,9 @@ class CustomTitleBar(QToolBar):
         Updates only the alpha channel of the background
         while preserving the rest of the UI design.
         """
+        if value < 1:
+            value = 1
+            self.opacity_spin.setValue(value)
         alpha = int(value * 255 / 100)
         new_style = f"""
             QWidget#MainContainer {{
@@ -148,39 +152,44 @@ class DrawingArea(QWidget):
         self.start_point = QPoint()
         self.end_point = QPoint()
         self.is_drawing = False
+        # 1. Create a list to store finished circles
+        self.circles = []
 
     def mousePressEvent(self, event):
-
         if event.button() == Qt.MouseButton.LeftButton:
             self.start_point = event.position().toPoint()
             self.end_point = self.start_point
             self.is_drawing = True
-            self.update()  # Triggers a repaint
+            self.update()
 
     def mouseMoveEvent(self, event):
         if self.is_drawing:
             self.end_point = event.position().toPoint()
-            self.update()  # Redraws the "preview" as you drag
+            self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.end_point = event.position().toPoint()
+            # 2. When finished, calculate the final radius and save it
+            r = math.sqrt((self.end_point.x() - self.start_point.x()) ** 2 + (self.end_point.y() - self.start_point.y()) ** 2)
+            self.circles.append((self.start_point, r))
+
             self.is_drawing = False
             self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(0, 0, 0), 2))
 
-        # Style the circle
-        pen = QPen(QColor(0, 0, 0), 2)
-        painter.setPen(pen)
-        painter.setBrush(QColor(255, 255, 255, 0))  # Semi-transparent white
+        # 3. Draw all previous circles first
+        for center, radius in self.circles:
+            painter.drawEllipse(center, radius, radius)
 
-        if not self.start_point.isNull() and not self.end_point.isNull():
-            # Define the bounding box for the ellipse
-            rect = QRect(self.start_point, self.end_point)
-            painter.drawEllipse(rect)
+        # 4. Draw the "active" circle (the preview)
+        if self.is_drawing:
+            r = math.sqrt((self.end_point.x() - self.start_point.x()) ** 2 +
+                          (self.end_point.y() - self.start_point.y()) ** 2)
+            painter.drawEllipse(self.start_point, r, r)
 
 # --- Main Window ---
 class ModernWindow(QMainWindow):
@@ -228,11 +237,8 @@ class ModernWindow(QMainWindow):
     def toggle_fullscreen(self):
         if not self._is_fullscreen:
             self.showFullScreen()
-            # Remove rounding when fullscreen
-            self.main_container.setStyleSheet(UIStyles.MAIN_CONTAINER.replace(UIStyles.RADIUS, "0px"))
         else:
             self.showNormal()
-            self.main_container.setStyleSheet(UIStyles.MAIN_CONTAINER)
         self._is_fullscreen = not self._is_fullscreen
 
     def mousePressEvent(self, event):
