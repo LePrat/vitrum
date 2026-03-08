@@ -152,7 +152,7 @@ class DrawingArea(QWidget):
         self.start_point = QPoint()
         self.end_point = QPoint()
         self.is_drawing = False
-        # 1. Create a list to store finished circles
+        # Store tuples of (center_point, spinbox_widget)
         self.circles = []
 
     def mousePressEvent(self, event):
@@ -160,7 +160,6 @@ class DrawingArea(QWidget):
             self.start_point = event.position().toPoint()
             self.end_point = self.start_point
             self.is_drawing = True
-            self.update()
 
     def mouseMoveEvent(self, event):
         if self.is_drawing:
@@ -169,9 +168,23 @@ class DrawingArea(QWidget):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # 2. When finished, calculate the final radius and save it
-            r = math.sqrt((self.end_point.x() - self.start_point.x()) ** 2 + (self.end_point.y() - self.start_point.y()) ** 2)
-            self.circles.append((self.start_point, r))
+            radius = int(math.dist((self.start_point.x(), self.start_point.y()),
+                                   (self.end_point.x(), self.end_point.y())))
+
+            # Create the SpinBox
+            sb = QSpinBox(self)
+            sb.setRange(1, 10000)
+            sb.setFixedWidth(80)
+            sb.setValue(radius)
+            # Move it slightly above the center
+            sb.move(self.start_point.x() - 20, self.start_point.y() - 40)
+            sb.show()
+
+            # When the user changes the number, redraw the canvas
+            sb.valueChanged.connect(self.update)
+
+            # Store the center and the widget itself
+            self.circles.append((self.start_point, sb))
 
             self.is_drawing = False
             self.update()
@@ -181,14 +194,15 @@ class DrawingArea(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor(0, 0, 0), 2))
 
-        # 3. Draw all previous circles first
-        for center, radius in self.circles:
-            painter.drawEllipse(center, radius, radius)
+        # 1. Draw finished circles using the SpinBox value as the radius
+        for center, sb in self.circles:
+            current_r = sb.value()
+            painter.drawEllipse(center, current_r, current_r)
 
-        # 4. Draw the "active" circle (the preview)
+        # 2. Draw the "preview" circle while dragging
         if self.is_drawing:
-            r = math.sqrt((self.end_point.x() - self.start_point.x()) ** 2 +
-                          (self.end_point.y() - self.start_point.y()) ** 2)
+            r = math.dist((self.start_point.x(), self.start_point.y()),
+                          (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
 
 # --- Main Window ---
