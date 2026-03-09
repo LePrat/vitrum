@@ -173,6 +173,7 @@ class DrawingArea(QWidget):
 
             # Create the SpinBox
             sb = QSpinBox(self)
+            sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(1, 10000)
             sb.setFixedWidth(80)
             sb.setValue(radius)
@@ -198,6 +199,7 @@ class DrawingArea(QWidget):
         for center, sb in self.circles:
             current_r = sb.value()
             painter.drawEllipse(center, current_r, current_r)
+            painter.drawPoint(center)
 
         # 2. Draw the "preview" circle while dragging
         if self.is_drawing:
