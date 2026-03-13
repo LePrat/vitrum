@@ -5,7 +5,7 @@ from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy, QComboBox, QSpinBox)
-from PySide6.QtCore import Qt, QPoint, QRect
+from PySide6.QtCore import Qt, QPoint
 
 
 # --- Configuration & Styles ---
@@ -84,6 +84,7 @@ class CustomTitleBar(QToolBar):
         self.parent_window: ModernWindow = parent
         self.setMovable(False)
         self.setStyleSheet(UIStyles.TOOLBAR)
+        self.spacer_action = None
         self.init_ui()
 
     def init_ui(self):
@@ -106,14 +107,19 @@ class CustomTitleBar(QToolBar):
         # 2. Spacer
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.addWidget(spacer)
+        self.spacer_action = self.addWidget(spacer)  # <-- save this
 
-        # 3. Window Buttons
+
+    # 3. Window Buttons
         self.btn_full = self._create_btn("⛶", self.parent_window.toggle_fullscreen)
         self.btn_close = self._create_btn("✕", self.parent_window.close, is_close=True)
 
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
+
+    def add_spin_box(self, circle_spin: QSpinBox):
+        self.insertSeparator(self.spacer_action)
+        self.insertWidget(self.spacer_action, circle_spin)
 
     def update_background_opacity(self, value):
         """
@@ -147,12 +153,12 @@ class CustomTitleBar(QToolBar):
 
 
 class DrawingArea(QWidget):
-    def __init__(self):
+    def __init__(self, parent: ModernWindow):
         super().__init__()
+        self.parent_window: ModernWindow = parent
         self.start_point = QPoint()
         self.end_point = QPoint()
         self.is_drawing = False
-        # Store tuples of (center_point, spinbox_widget)
         self.circles = []
 
     def mousePressEvent(self, event):
@@ -171,18 +177,14 @@ class DrawingArea(QWidget):
             radius = int(math.dist((self.start_point.x(), self.start_point.y()),
                                    (self.end_point.x(), self.end_point.y())))
 
-            # Create the SpinBox
             sb = QSpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(1, 10000)
-            sb.setFixedWidth(80)
             sb.setValue(radius)
-            # Move it slightly above the center
-            sb.move(self.start_point.x() - 20, self.start_point.y() - 40)
-            sb.show()
-
-            # When the user changes the number, redraw the canvas
+            sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+            sb.setStyleSheet(UIStyles.OPACITY_TOOL)
             sb.valueChanged.connect(self.update)
+            self.parent_window.title_bar.add_spin_box(sb)
 
             # Store the center and the widget itself
             self.circles.append((self.start_point, sb))
@@ -207,7 +209,7 @@ class DrawingArea(QWidget):
                           (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
 
-# --- Main Window ---
+
 class ModernWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -242,12 +244,9 @@ class ModernWindow(QMainWindow):
         # Custom Toolbar
         self.title_bar = CustomTitleBar(self)
         self.main_layout.addWidget(self.title_bar)
-
         self.content_area = QWidget()
-
         self.sizegrip = QSizeGrip(self)
-
-        self.content_area = DrawingArea()
+        self.content_area = DrawingArea(self)
         self.main_layout.addWidget(self.content_area, stretch=1)
 
     def toggle_fullscreen(self):
@@ -277,6 +276,9 @@ class ModernWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    # TODO when spinbox focus, highlight circle
+    # TODO setscale feature = line shape, button set scale, form unit value, modifying of existing shapes
+    # TODO save feature
     app = QApplication(sys.argv)
     window = ModernWindow()
     window.show()
