@@ -71,6 +71,23 @@ class UIStyles:
     """
 
 
+class MySpinBox(QSpinBox):
+    def __init__(self, drawing_area: DrawingArea, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_focused = False
+        self.drawing_area = drawing_area
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self.is_focused = True
+        self.drawing_area.update()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.is_focused = False
+        self.drawing_area.update()
+
+
 # --- Custom Widgets ---
 class CustomTitleBar(QToolBar):
     """A specialized toolbar that handles window movement and controls."""
@@ -103,12 +120,12 @@ class CustomTitleBar(QToolBar):
         self.mode_select.setStyleSheet(UIStyles.MODE_SELECT)
         self.addSeparator()
         self.addWidget(self.mode_select)
+        self.addSeparator()
 
         # 2. Spacer
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.spacer_action = self.addWidget(spacer)  # <-- save this
-
+        self.spacer_action = self.addWidget(spacer)
 
     # 3. Window Buttons
         self.btn_full = self._create_btn("⛶", self.parent_window.toggle_fullscreen)
@@ -117,7 +134,7 @@ class CustomTitleBar(QToolBar):
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
 
-    def add_spin_box(self, circle_spin: QSpinBox):
+    def add_spin_box(self, circle_spin: MySpinBox):
         self.insertSeparator(self.spacer_action)
         self.insertWidget(self.spacer_action, circle_spin)
 
@@ -177,7 +194,7 @@ class DrawingArea(QWidget):
             radius = int(math.dist((self.start_point.x(), self.start_point.y()),
                                    (self.end_point.x(), self.end_point.y())))
 
-            sb = QSpinBox(self)
+            sb = MySpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(1, 10000)
             sb.setValue(radius)
@@ -195,13 +212,19 @@ class DrawingArea(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(0, 0, 0), 2))
 
         # 1. Draw finished circles using the SpinBox value as the radius
         for center, sb in self.circles:
             current_r = sb.value()
-            painter.drawEllipse(center, current_r, current_r)
-            painter.drawPoint(center)
+            if sb.is_focused:
+                painter.setPen(QPen(QColor(204, 204, 0), 2))
+                painter.drawEllipse(center, current_r, current_r)
+                painter.drawPoint(center)
+                painter.setPen(QPen(QColor(0, 0, 0), 2))
+            else:
+                painter.setPen(QPen(QColor(0, 0, 0), 2))
+                painter.drawEllipse(center, current_r, current_r)
+                painter.drawPoint(center)
 
         # 2. Draw the "preview" circle while dragging
         if self.is_drawing:
