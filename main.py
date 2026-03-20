@@ -71,9 +71,9 @@ class UIStyles:
         QComboBox QAbstractItemView { background-color: #2b2b2b; color: white; }
     """
 
-def create_btn(text, callback, is_close=False):
+def create_btn(text, callback, is_close=False, width=32):
     btn = QPushButton(text)
-    btn.setFixedSize(32, 28)
+    btn.setFixedSize(width, 28)
     hover_color = "#e81123" if is_close else "rgba(255, 255, 255, 40)"
     btn.setStyleSheet(f"""
         QPushButton {{ background: transparent; color: white; border-radius: 4px; font-size: 14px; }}
@@ -116,6 +116,7 @@ class CustomTitleBar(QToolBar):
         self.setStyleSheet(UIStyles.TOOLBAR)
         self.spacer_action = None
         self.circles = None
+        self.btn_set_scale = None
         self.init_ui()
 
     def init_ui(self):
@@ -144,7 +145,9 @@ class CustomTitleBar(QToolBar):
     # 3. Window Buttons
         self.btn_full = create_btn("⛶", self.parent_window.toggle_fullscreen)
         self.btn_close = create_btn("✕", self.parent_window.close, is_close=True)
+        self.btn_set_scale = create_btn("Set scale", None, is_close=False, width=70)
 
+        self.addWidget(self.btn_set_scale)
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
 
@@ -246,6 +249,9 @@ class DrawingArea(QWidget):
                       (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
 
+        elif self.is_drawing and title_bar.mode_select.currentText() == "Line":
+            painter.drawLine(self.start_point, self.end_point)
+
 
 class ModernWindow(QMainWindow):
     def __init__(self):
@@ -313,7 +319,7 @@ class ModernWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # TODO setscale feature = line shape, button set scale, form unit value, modifying of existing shapes
+    # TODO setscale feature =  button set scale, form unit value, modifying of existing shapes
     # TODO save feature
     app = QApplication(sys.argv)
     window = ModernWindow()
