@@ -129,7 +129,7 @@ class CustomTitleBar(QToolBar):
         self.opacity_spin.valueChanged.connect(self.update_background_opacity)
         self.addWidget(self.opacity_spin)
 
-        self.mode_select = QComboBox()
+        self.mode_select: QComboBox = QComboBox()
         self.mode_select.addItems(["Circle", "Line"])
         self.mode_select.setStyleSheet(UIStyles.MODE_SELECT)
         self.addSeparator()
@@ -190,7 +190,8 @@ class DrawingArea(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
+        title_bar = self.parent_window.title_bar
+        if event.button() == Qt.MouseButton.LeftButton and title_bar.mode_select.currentText() == "Circle":
             radius = int(math.dist((self.start_point.x(), self.start_point.y()),
                                    (self.end_point.x(), self.end_point.y())))
 
@@ -204,7 +205,6 @@ class DrawingArea(QWidget):
 
             # Store the center and the widget itself
             self.circles[self.id] = (self.start_point, sb)
-            title_bar = self.parent_window.title_bar
 
             xid = deepcopy(self.id)
             btn = create_btn("✕", lambda: self.delete_circle_callback(xid, sb), is_close=False)
@@ -212,21 +212,21 @@ class DrawingArea(QWidget):
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
             title_bar.insertWidget(x_action, sb)
 
+            self.id += 1
             self.is_drawing = False
             self.update()
-            self.id += 1
 
     def delete_circle_callback(self, circle_id, sb):
         del self.circles[circle_id]
         sb.deleteLater()
         self.update()
 
-
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor(0, 0, 0), 2))
 
+        title_bar: CustomTitleBar = self.parent_window.title_bar
         # 1. Draw finished circles using the SpinBox value as the radius
         for center, sb in self.circles.values():
             current_r = sb.value()
@@ -240,10 +240,10 @@ class DrawingArea(QWidget):
                 painter.drawEllipse(center, current_r, current_r)
                 painter.drawPoint(center)
 
-        # 2. Draw the "preview" circle while dragging
-        if self.is_drawing:
+            # 2. Draw the "preview" circle while dragging
+        if self.is_drawing and title_bar.mode_select.currentText() == "Circle":
             r = math.dist((self.start_point.x(), self.start_point.y()),
-                          (self.end_point.x(), self.end_point.y()))
+                      (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
 
 
