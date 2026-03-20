@@ -1,5 +1,6 @@
 import math
 import sys
+from copy import deepcopy
 
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
@@ -70,6 +71,18 @@ class UIStyles:
         QComboBox QAbstractItemView { background-color: #2b2b2b; color: white; }
     """
 
+def create_btn(text, callback, is_close=False):
+    btn = QPushButton(text)
+    btn.setFixedSize(32, 28)
+    hover_color = "#e81123" if is_close else "rgba(255, 255, 255, 40)"
+    btn.setStyleSheet(f"""
+        QPushButton {{ background: transparent; color: white; border-radius: 4px; font-size: 14px; }}
+        QPushButton:hover {{ background: {hover_color}; }}
+    """)
+    if callback is not None:
+        btn.clicked.connect(callback)
+    return btn
+
 
 class MySpinBox(QSpinBox):
     def __init__(self, drawing_area: DrawingArea, *args, **kwargs):
@@ -102,6 +115,7 @@ class CustomTitleBar(QToolBar):
         self.setMovable(False)
         self.setStyleSheet(UIStyles.TOOLBAR)
         self.spacer_action = None
+        self.circles = None
         self.init_ui()
 
     def init_ui(self):
@@ -128,15 +142,12 @@ class CustomTitleBar(QToolBar):
         self.spacer_action = self.addWidget(spacer)
 
     # 3. Window Buttons
-        self.btn_full = self._create_btn("⛶", self.parent_window.toggle_fullscreen)
-        self.btn_close = self._create_btn("✕", self.parent_window.close, is_close=True)
+        self.btn_full = create_btn("⛶", self.parent_window.toggle_fullscreen)
+        self.btn_close = create_btn("✕", self.parent_window.close, is_close=True)
 
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
 
-    def add_spin_box(self, circle_spin: MySpinBox):
-        self.insertSeparator(self.spacer_action)
-        self.insertWidget(self.spacer_action, circle_spin)
 
     def update_background_opacity(self, value):
         """
@@ -156,18 +167,6 @@ class CustomTitleBar(QToolBar):
         """
         self.parent_window.main_container.setStyleSheet(new_style)
 
-    @staticmethod
-    def _create_btn(text, callback, is_close=False):
-        btn = QPushButton(text)
-        btn.setFixedSize(32, 28)
-        hover_color = "#e81123" if is_close else "rgba(255, 255, 255, 40)"
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: white; border-radius: 4px; font-size: 14px; }}
-            QPushButton:hover {{ background: {hover_color}; }}
-        """)
-        btn.clicked.connect(callback)
-        return btn
-
 
 class DrawingArea(QWidget):
     def __init__(self, parent: ModernWindow):
@@ -176,7 +175,8 @@ class DrawingArea(QWidget):
         self.start_point = QPoint()
         self.end_point = QPoint()
         self.is_drawing = False
-        self.circles = []
+        self.id = 1
+        self.circles = {}
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -201,20 +201,34 @@ class DrawingArea(QWidget):
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setStyleSheet(UIStyles.OPACITY_TOOL)
             sb.valueChanged.connect(self.update)
-            self.parent_window.title_bar.add_spin_box(sb)
 
             # Store the center and the widget itself
-            self.circles.append((self.start_point, sb))
+            self.circles[self.id] = (self.start_point, sb)
+            title_bar = self.parent_window.title_bar
+
+            xid = deepcopy(self.id)
+            btn = create_btn("✕", lambda: self.delete_circle_callback(xid, sb), is_close=False)
+            btn.clicked.connect(btn.deleteLater)
+            x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
+            title_bar.insertWidget(x_action, sb)
 
             self.is_drawing = False
             self.update()
+            self.id += 1
+
+    def delete_circle_callback(self, circle_id, sb):
+        del self.circles[circle_id]
+        sb.deleteLater()
+        self.update()
+
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(0, 0, 0), 2))
 
         # 1. Draw finished circles using the SpinBox value as the radius
-        for center, sb in self.circles:
+        for center, sb in self.circles.values():
             current_r = sb.value()
             if sb.is_focused:
                 painter.setPen(QPen(QColor(204, 204, 0), 2))
@@ -299,7 +313,6 @@ class ModernWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # TODO when spinbox focus, highlight circle
     # TODO setscale feature = line shape, button set scale, form unit value, modifying of existing shapes
     # TODO save feature
     app = QApplication(sys.argv)
