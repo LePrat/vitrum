@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run --script
 import math
 import sys
 from copy import deepcopy
