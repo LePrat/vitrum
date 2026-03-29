@@ -158,9 +158,6 @@ class CustomTitleBar(QToolBar):
         Updates only the alpha channel of the background
         while preserving the rest of the UI design.
         """
-        if value < 1:
-            value = 1
-            self.opacity_spin.setValue(value)
         alpha = int(value * 255 / 100)
         new_style = f"""
             QWidget#MainContainer {{
@@ -172,17 +169,17 @@ class CustomTitleBar(QToolBar):
         self.parent_window.main_container.setStyleSheet(new_style)
 
     def update_scale(self):
-        user_value = 2.5
-        drawing_area = self.parent_window.content_area
-        circles = drawing_area.circles
-        max_key = max(circles.keys())
-        length_mesured = circles[max_key][1].value()
-        scale_value = 1 / (length_mesured / user_value)
-
-        drawing_area.scale_value *= scale_value
-        for start_point, sb in drawing_area.circles.values():
-            sb.setValue(sb.value() * scale_value)
-        drawing_area.update()
+        drawing_area: DrawingArea = self.parent_window.content_area
+        drawing_area.is_scale_mode = True
+        # circles = drawing_area.circles
+        # max_key = max(circles.keys())
+        # length_mesured = circles[max_key][1].value()
+        # scale_value = 1 / (length_mesured / user_value)
+        #
+        # drawing_area.scale_value *= scale_value
+        # for start_point, sb in drawing_area.circles.values():
+        #     sb.setValue(sb.value() * scale_value)
+        # drawing_area.update()
 
 
 
@@ -196,6 +193,7 @@ class DrawingArea(QWidget):
         self.id = 1
         self.circles = {}
         self.scale_value = 1
+        self.is_scale_mode = False
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -210,13 +208,13 @@ class DrawingArea(QWidget):
 
     def mouseReleaseEvent(self, event):
         title_bar = self.parent_window.title_bar
-        if event.button() == Qt.MouseButton.LeftButton and title_bar.mode_select.currentText() == "Circle":
+        if event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode is False and title_bar.mode_select.currentText() == "Circle":
             radius = int(math.dist((self.start_point.x(), self.start_point.y()),
                                    (self.end_point.x(), self.end_point.y())))
 
             sb = MySpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-            sb.setRange(1, 10000)
+            sb.setRange(0, 10000)
             sb.setValue(radius * self.scale_value)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setStyleSheet(UIStyles.OPACITY_TOOL)
@@ -232,8 +230,21 @@ class DrawingArea(QWidget):
             title_bar.insertWidget(x_action, sb)
 
             self.id += 1
-            self.is_drawing = False
             self.update()
+
+        elif event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode:
+            user_value = 2.5
+            length_mesured = int(math.dist((self.start_point.x(), self.start_point.y()),
+                                   (self.end_point.x(), self.end_point.y())))
+            scale_value = 1 / (length_mesured / user_value)
+
+            self.scale_value *= scale_value
+            for start_point, sb in self.circles.values():
+                sb.setValue(sb.value() * scale_value)
+            self.is_scale_mode = False
+            self.update()
+
+        self.is_drawing = False
 
     def delete_circle_callback(self, circle_id, sb):
         del self.circles[circle_id]
@@ -259,8 +270,11 @@ class DrawingArea(QWidget):
                 painter.drawEllipse(center, current_r, current_r)
                 painter.drawPoint(center)
 
+        if self.is_drawing and self.is_scale_mode:
+            painter.drawLine(self.start_point, self.end_point)
+
+        elif self.is_drawing and title_bar.mode_select.currentText() == "Circle":
             # 2. Draw the "preview" circle while dragging
-        if self.is_drawing and title_bar.mode_select.currentText() == "Circle":
             r = math.dist((self.start_point.x(), self.start_point.y()),
                       (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
