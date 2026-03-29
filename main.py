@@ -171,7 +171,7 @@ class CustomTitleBar(QToolBar):
         self.parent_window.main_container.setStyleSheet(new_style)
 
     def update_scale(self):
-        user_value = 10
+        user_value = 2.5
         drawing_area = self.parent_window.content_area
         circles = drawing_area.circles
         max_key = max(circles.keys())
