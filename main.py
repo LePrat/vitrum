@@ -172,9 +172,9 @@ class CustomTitleBar(QToolBar):
 
     def update_scale(self):
         drawing_area = self.parent_window.content_area
-        drawing_area.scale_value = drawing_area.scale_value * 0.5
+        drawing_area.scale_value *= 0.5
         for start_point, sb in drawing_area.circles.values():
-            sb.setValue(sb.value() * drawing_area.scale_value)
+            sb.setValue(sb.value() * 0.5)
         drawing_area.update()
 
 
@@ -328,7 +328,7 @@ class ModernWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # TODO setscale feature =  button set scale, form unit value, edit existing unit values
+    # TODO setscale feature = form unit value
     # TODO save feature
     app = QApplication(sys.argv)
     window = ModernWindow()
