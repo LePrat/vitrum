@@ -221,7 +221,9 @@ class DrawingArea(QWidget):
             sb.valueChanged.connect(self.update)
 
             # Store the center and the widget itself
-            self.circles[self.id] = (self.start_point, sb)
+
+            self.circles[self.id] = (self.start_point, sb, radius)  # add radius
+
 
             xid = deepcopy(self.id)
             btn = create_btn("✕", lambda: self.delete_circle_callback(xid, sb), is_close=False)
@@ -233,17 +235,14 @@ class DrawingArea(QWidget):
             self.update()
 
         elif event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode:
-            user_value = 2.5
-            length_mesured = int(math.dist((self.start_point.x(), self.start_point.y()),
-                                   (self.end_point.x(), self.end_point.y())))
-            scale_value = 1 / (length_mesured / user_value)
-
-            self.scale_value *= scale_value
-            for start_point, sb in self.circles.values():
-                sb.setValue(sb.value() * scale_value)
+            user_value = 0.5
+            length_measured = math.dist((self.start_point.x(), self.start_point.y()),
+                                        (self.end_point.x(), self.end_point.y()))
+            self.scale_value = user_value / length_measured
+            for center, sb, original_r in self.circles.values():
+                sb.setValue(original_r * self.scale_value)
             self.is_scale_mode = False
             self.update()
-
         self.is_drawing = False
 
     def delete_circle_callback(self, circle_id, sb):
@@ -258,8 +257,8 @@ class DrawingArea(QWidget):
 
         title_bar: CustomTitleBar = self.parent_window.title_bar
         # 1. Draw finished circles using the SpinBox value as the radius
-        for center, sb in self.circles.values():
-            current_r = sb.value() / self.scale_value
+        for center, sb, original_r  in self.circles.values():
+            current_r = original_r
             if sb.is_focused:
                 painter.setPen(QPen(QColor(204, 204, 0), 2))
                 painter.drawEllipse(center, current_r, current_r)
