@@ -5,7 +5,7 @@ from copy import deepcopy
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QComboBox, QSpinBox)
+                               QToolBar, QSizePolicy, QComboBox, QSpinBox, QDoubleSpinBox)
 from PySide6.QtCore import Qt, QPoint
 
 
@@ -84,7 +84,7 @@ def create_btn(text, callback, is_close=False, width=32):
     return btn
 
 
-class MySpinBox(QSpinBox):
+class MySpinBox(QDoubleSpinBox):
     def __init__(self, drawing_area: DrawingArea, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_focused = False
@@ -145,7 +145,7 @@ class CustomTitleBar(QToolBar):
     # 3. Window Buttons
         self.btn_full = create_btn("⛶", self.parent_window.toggle_fullscreen)
         self.btn_close = create_btn("✕", self.parent_window.close, is_close=True)
-        self.btn_set_scale = create_btn("Set scale", None, is_close=False, width=70)
+        self.btn_set_scale = create_btn("Set scale", self.update_scale, is_close=False, width=70)
 
         self.addWidget(self.btn_set_scale)
         self.addWidget(self.btn_full)
@@ -170,6 +170,14 @@ class CustomTitleBar(QToolBar):
         """
         self.parent_window.main_container.setStyleSheet(new_style)
 
+    def update_scale(self):
+        drawing_area = self.parent_window.content_area
+        drawing_area.scale_value = drawing_area.scale_value * 0.5
+        for start_point, sb in drawing_area.circles.values():
+            sb.setValue(sb.value() * drawing_area.scale_value)
+        drawing_area.update()
+
+
 
 class DrawingArea(QWidget):
     def __init__(self, parent: ModernWindow):
@@ -180,6 +188,7 @@ class DrawingArea(QWidget):
         self.is_drawing = False
         self.id = 1
         self.circles = {}
+        self.scale_value = 1
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -201,7 +210,7 @@ class DrawingArea(QWidget):
             sb = MySpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(1, 10000)
-            sb.setValue(radius)
+            sb.setValue(radius * self.scale_value)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setStyleSheet(UIStyles.OPACITY_TOOL)
             sb.valueChanged.connect(self.update)
@@ -232,7 +241,7 @@ class DrawingArea(QWidget):
         title_bar: CustomTitleBar = self.parent_window.title_bar
         # 1. Draw finished circles using the SpinBox value as the radius
         for center, sb in self.circles.values():
-            current_r = sb.value()
+            current_r = sb.value() / self.scale_value
             if sb.is_focused:
                 painter.setPen(QPen(QColor(204, 204, 0), 2))
                 painter.drawEllipse(center, current_r, current_r)
@@ -319,7 +328,7 @@ class ModernWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # TODO setscale feature =  button set scale, form unit value, modifying of existing shapes
+    # TODO setscale feature =  button set scale, form unit value, edit existing unit values
     # TODO save feature
     app = QApplication(sys.argv)
     window = ModernWindow()
