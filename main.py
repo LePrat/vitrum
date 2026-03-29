@@ -7,12 +7,12 @@ from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
                                QToolBar, QSizePolicy, QComboBox, QSpinBox, QDoubleSpinBox)
-from PySide6.QtCore import Qt, QPoint
+from PySide6.QtCore import Qt, QPoint, QLocale
 
 
 # --- Configuration & Styles ---
 class UIStyles:
-    TRANSPARENCY = 70
+    TRANSPARENCY = int(50 * 255 / 100)
     BG_COLOR = f"rgba(30, 30, 30, {TRANSPARENCY})"
     RADIUS = "12px"
 
@@ -126,7 +126,7 @@ class CustomTitleBar(QToolBar):
         self.opacity_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.opacity_spin.setRange(0, 100)
         self.opacity_spin.setSuffix("%")
-        self.opacity_spin.setValue(70)
+        self.opacity_spin.setValue(50)
         self.opacity_spin.setStyleSheet(UIStyles.OPACITY_TOOL)
         self.opacity_spin.valueChanged.connect(self.update_background_opacity)
         self.addWidget(self.opacity_spin)
@@ -258,7 +258,7 @@ class DrawingArea(QWidget):
         title_bar: CustomTitleBar = self.parent_window.title_bar
         # 1. Draw finished circles using the SpinBox value as the radius
         for center, sb, original_r  in self.circles.values():
-            current_r = original_r
+            current_r = sb.value() / self.scale_value
             if sb.is_focused:
                 painter.setPen(QPen(QColor(204, 204, 0), 2))
                 painter.drawEllipse(center, current_r, current_r)
@@ -350,6 +350,7 @@ class ModernWindow(QMainWindow):
 if __name__ == "__main__":
     # TODO setscale feature = form unit value
     # TODO save feature
+    QLocale.setDefault(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
     app = QApplication(sys.argv)
     window = ModernWindow()
     window.show()
