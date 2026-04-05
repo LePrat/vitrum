@@ -88,6 +88,7 @@ def create_btn(text, callback, is_close=False, width=32):
 class MySpinBox(QDoubleSpinBox):
     def __init__(self, drawing_area: DrawingArea, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setDecimals(5)
         self.is_focused = False
         self.drawing_area = drawing_area
 
@@ -209,9 +210,8 @@ class DrawingArea(QWidget):
     def mouseReleaseEvent(self, event):
         title_bar = self.parent_window.title_bar
         if event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode is False and title_bar.mode_select.currentText() == "Circle":
-            radius = int(math.dist((self.start_point.x(), self.start_point.y()),
-                                   (self.end_point.x(), self.end_point.y())))
-
+            radius = math.dist((self.start_point.x(), self.start_point.y()),
+                                   (self.end_point.x(), self.end_point.y()))
             sb = MySpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(0, 10000)
@@ -225,7 +225,7 @@ class DrawingArea(QWidget):
             self.circles[self.id] = (self.start_point, sb, radius)  # add radius
 
 
-            xid = deepcopy(self.id)
+            xid = self.id
             btn = create_btn("✕", lambda: self.delete_circle_callback(xid, sb), is_close=False)
             btn.clicked.connect(btn.deleteLater)
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
