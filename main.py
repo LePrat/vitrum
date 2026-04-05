@@ -2,7 +2,6 @@
 import math
 import sys
 from copy import deepcopy
-from pprint import pprint as pp
 
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
