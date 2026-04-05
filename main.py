@@ -2,6 +2,7 @@
 import math
 import sys
 from copy import deepcopy
+from pprint import pprint as pp
 
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
@@ -172,16 +173,6 @@ class CustomTitleBar(QToolBar):
     def update_scale(self):
         drawing_area: DrawingArea = self.parent_window.content_area
         drawing_area.is_scale_mode = True
-        # circles = drawing_area.circles
-        # max_key = max(circles.keys())
-        # length_mesured = circles[max_key][1].value()
-        # scale_value = 1 / (length_mesured / user_value)
-        #
-        # drawing_area.scale_value *= scale_value
-        # for start_point, sb in drawing_area.circles.values():
-        #     sb.setValue(sb.value() * scale_value)
-        # drawing_area.update()
-
 
 
 class DrawingArea(QWidget):
@@ -215,18 +206,15 @@ class DrawingArea(QWidget):
             sb = MySpinBox(self)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setRange(0, 10000)
-            sb.setValue(radius * self.scale_value)
+            sb_value = radius * self.scale_value
+            sb.setValue(sb_value)
             sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
             sb.setStyleSheet(UIStyles.OPACITY_TOOL)
-            sb.valueChanged.connect(self.update)
+            sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
 
-            # Store the center and the widget itself
-
-            self.circles[self.id] = (self.start_point, sb, radius)  # add radius
-
-
-            xid = self.id
-            btn = create_btn("✕", lambda: self.delete_circle_callback(xid, sb), is_close=False)
+            self.circles[self.id] = [self.start_point, sb, radius]
+            circle_id = deepcopy(self.id)
+            btn = create_btn("✕", lambda: self.delete_circle_callback(circle_id, sb), is_close=False)
             btn.clicked.connect(btn.deleteLater)
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
             title_bar.insertWidget(x_action, sb)
@@ -244,6 +232,10 @@ class DrawingArea(QWidget):
             self.is_scale_mode = False
             self.update()
         self.is_drawing = False
+
+    def circle_resize(self, circle_id, sb_value):
+        self.circles[circle_id][2] =  sb_value / self.scale_value
+        self.update()
 
     def delete_circle_callback(self, circle_id, sb):
         del self.circles[circle_id]
