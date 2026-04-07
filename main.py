@@ -324,7 +324,7 @@ class ModernWindow(QMainWindow):
             self._toggle_lock_signal.emit()  # safe to emit from any thread
 
         self._hotkey_listener = keyboard.GlobalHotKeys({
-            '<ctrl>+<alt>+l': on_activate
+            '<ctrl>+<alt>+m': on_activate
         })
         self._hotkey_listener.daemon = True
         self._hotkey_listener.start()
