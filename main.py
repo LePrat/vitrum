@@ -6,8 +6,9 @@ from copy import deepcopy
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QComboBox, QSpinBox, QDoubleSpinBox)
-from PySide6.QtCore import Qt, QPoint, QLocale
+                               QToolBar, QSizePolicy, QComboBox, QSpinBox, QDoubleSpinBox, QSystemTrayIcon, QMenu)
+from PySide6.QtCore import Qt, QPoint, QLocale, Slot, QMetaObject, Signal
+from pynput import keyboard
 
 
 # --- Configuration & Styles ---
@@ -274,6 +275,8 @@ class DrawingArea(QWidget):
 
 
 class ModernWindow(QMainWindow):
+    _toggle_lock_signal = Signal()
+
     def __init__(self):
         super().__init__()
         self.painter = None
@@ -284,6 +287,10 @@ class ModernWindow(QMainWindow):
         self.main_container: QWidget = None
         self._is_fullscreen = False
         self._drag_pos = None
+        self._locked = False
+        self._normal_flags = None
+        self._toggle_lock_signal.connect(self.toggle_lock)  # signal → slot, always on main thread
+        self._start_hotkey_listener()
 
         self.setup_window_properties()
         self.setup_ui()
@@ -312,6 +319,16 @@ class ModernWindow(QMainWindow):
         self.content_area = DrawingArea(self)
         self.main_layout.addWidget(self.content_area, stretch=1)
 
+    def _start_hotkey_listener(self):
+        def on_activate():
+            self._toggle_lock_signal.emit()  # safe to emit from any thread
+
+        self._hotkey_listener = keyboard.GlobalHotKeys({
+            '<ctrl>+<alt>+l': on_activate
+        })
+        self._hotkey_listener.daemon = True
+        self._hotkey_listener.start()
+
     def toggle_fullscreen(self):
         if not self._is_fullscreen:
             self.showFullScreen()
@@ -337,9 +354,33 @@ class ModernWindow(QMainWindow):
         super().resizeEvent(event)
         self.sizegrip.move(self.width() - 20, self.height() - 20)
 
+    def lock_window(self):
+        self._normal_flags = self.windowFlags()
+        flags = (
+                Qt.WindowType.FramelessWindowHint  # no title bar / borders
+                | Qt.WindowType.WindowStaysOnTopHint  # always in foreground
+                | Qt.WindowType.WindowTransparentForInput  # <-- the magic: all input ignored
+                | Qt.WindowType.Tool  # keeps it out of taskbar
+        )
+        self.setWindowFlags(flags)
+        self.show()
+        self._locked = True
+
+    def unlock_window(self):
+        if not self._locked:
+            return
+        self.setWindowFlags(self._normal_flags)
+        self.show()
+        self._locked = False
+
+    @Slot()
+    def toggle_lock(self):
+        if self._locked:
+            self.unlock_window()
+        else:
+            self.lock_window()
 
 if __name__ == "__main__":
-    # TODO setscale feature = form unit value
     # TODO save feature
     QLocale.setDefault(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
     app = QApplication(sys.argv)
