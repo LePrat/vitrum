@@ -1,4 +1,5 @@
 #!/usr/bin/env -S uv run --script
+import json
 import math
 import sys
 from copy import deepcopy
@@ -6,8 +7,8 @@ from copy import deepcopy
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QComboBox, QSpinBox, QDoubleSpinBox, QSystemTrayIcon, QMenu)
-from PySide6.QtCore import Qt, QPoint, QLocale, Slot, QMetaObject, Signal
+                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox)
+from PySide6.QtCore import Qt, QPoint, QLocale, Slot, Signal
 from pynput import keyboard
 
 
@@ -91,6 +92,10 @@ class MySpinBox(QDoubleSpinBox):
         super().__init__(*args, **kwargs)
         self.setDecimals(5)
         self.is_focused = False
+        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.setRange(0, 10000)
+        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.setStyleSheet(UIStyles.OPACITY_TOOL)
         self.drawing_area = drawing_area
 
     def focusInEvent(self, event):
@@ -102,6 +107,9 @@ class MySpinBox(QDoubleSpinBox):
         super().focusOutEvent(event)
         self.is_focused = False
         self.drawing_area.update()
+
+    def __repr__(self):
+        return str(self.value())
 
 
 # --- Custom Widgets ---
@@ -132,15 +140,7 @@ class CustomTitleBar(QToolBar):
         self.opacity_spin.setStyleSheet(UIStyles.OPACITY_TOOL)
         self.opacity_spin.valueChanged.connect(self.update_background_opacity)
         self.addWidget(self.opacity_spin)
-
-        self.mode_select: QComboBox = QComboBox()
-        self.mode_select.addItems(["Circle", "Line"])
-        self.mode_select.setStyleSheet(UIStyles.MODE_SELECT)
         self.addSeparator()
-        self.addWidget(self.mode_select)
-        self.addSeparator()
-
-        # 2. Spacer
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.spacer_action = self.addWidget(spacer)
@@ -186,6 +186,36 @@ class DrawingArea(QWidget):
         self.circles = {}
         self.scale_value = 1
         self.is_scale_mode = False
+        # self.load_from_file("save.json")
+
+    def load_from_file(self, file_path: str):
+        with open(file_path) as user_file:
+            file_contents = user_file.read()
+        json_data: dict = json.loads(file_contents)
+
+        self.id = int(max(json_data["circles"], key=int)) + 1
+        self.scale_value = int(json_data["scale"])
+        title_bar = self.parent_window.title_bar
+
+        for json_circle_id, circle_data in json_data["circles"].items():
+            json_circle_id = int(json_circle_id)
+            circle_id = json_circle_id
+            radius = circle_data["radius"]
+            sb = MySpinBox(self)
+            sb_value = radius * self.scale_value
+            sb.setValue(sb_value)
+            sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
+
+            point = circle_data["point"]
+            qpoint = QPoint(int(point["x"]), int(point["y"]))
+            self.circles[json_circle_id] = [QPoint(qpoint), sb, radius]
+
+            delete_callback = lambda _=None, cid=circle_id, spinbox=sb : self.delete_circle_callback(cid, spinbox)
+            btn = create_btn("✕", delete_callback, is_close=False)
+            btn.clicked.connect(btn.deleteLater)
+            x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
+            title_bar.insertWidget(x_action, sb)
+        self.update()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -200,20 +230,16 @@ class DrawingArea(QWidget):
 
     def mouseReleaseEvent(self, event):
         title_bar = self.parent_window.title_bar
-        if event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode is False and title_bar.mode_select.currentText() == "Circle":
+        if event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode is False:
+            circle_id = deepcopy(self.id)
             radius = math.dist((self.start_point.x(), self.start_point.y()),
                                    (self.end_point.x(), self.end_point.y()))
             sb = MySpinBox(self)
-            sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-            sb.setRange(0, 10000)
             sb_value = radius * self.scale_value
             sb.setValue(sb_value)
-            sb.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-            sb.setStyleSheet(UIStyles.OPACITY_TOOL)
             sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
 
             self.circles[self.id] = [self.start_point, sb, radius]
-            circle_id = deepcopy(self.id)
             btn = create_btn("✕", lambda: self.delete_circle_callback(circle_id, sb), is_close=False)
             btn.clicked.connect(btn.deleteLater)
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
@@ -238,7 +264,10 @@ class DrawingArea(QWidget):
         self.update()
 
     def delete_circle_callback(self, circle_id, sb):
+        print("id:", circle_id)
+        print(self.circles)
         del self.circles[circle_id]
+        print(self.circles)
         sb.deleteLater()
         self.update()
 
@@ -247,8 +276,6 @@ class DrawingArea(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor(0, 0, 0), 2))
 
-        title_bar: CustomTitleBar = self.parent_window.title_bar
-        # 1. Draw finished circles using the SpinBox value as the radius
         for center, sb, original_r  in self.circles.values():
             current_r = sb.value() / self.scale_value
             if sb.is_focused:
@@ -264,14 +291,10 @@ class DrawingArea(QWidget):
         if self.is_drawing and self.is_scale_mode:
             painter.drawLine(self.start_point, self.end_point)
 
-        elif self.is_drawing and title_bar.mode_select.currentText() == "Circle":
-            # 2. Draw the "preview" circle while dragging
+        elif self.is_drawing:
             r = math.dist((self.start_point.x(), self.start_point.y()),
                       (self.end_point.x(), self.end_point.y()))
             painter.drawEllipse(self.start_point, r, r)
-
-        elif self.is_drawing and title_bar.mode_select.currentText() == "Line":
-            painter.drawLine(self.start_point, self.end_point)
 
 
 class ModernWindow(QMainWindow):
