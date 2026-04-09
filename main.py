@@ -7,7 +7,7 @@ from copy import deepcopy
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox)
+                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox, QToolButton, QMenu)
 from PySide6.QtCore import Qt, QPoint, QLocale, Slot, Signal
 from pynput import keyboard
 
@@ -17,7 +17,6 @@ class UIStyles:
     TRANSPARENCY = int(50 * 255 / 100)
     BG_COLOR = f"rgba(30, 30, 30, {TRANSPARENCY})"
     RADIUS = "12px"
-
     MAIN_CONTAINER = f"""
         QWidget#MainContainer {{
             background-color: {BG_COLOR};
@@ -25,7 +24,6 @@ class UIStyles:
             border: 1px solid rgba(255, 255, 255, 40);
         }}
     """
-
     TOOLBAR = f"""
     QToolBar {{
         background: rgba(255, 255, 255, 70);
@@ -44,7 +42,6 @@ class UIStyles:
     QToolButton {{ 
         color: white; 
         padding: 5px; 
-        font-weight: bold; 
     }}
     
     QToolButton:hover {{ 
@@ -52,7 +49,6 @@ class UIStyles:
         border-radius: 4px; 
     }}
     """
-
     OPACITY_TOOL = """
         QSpinBox {
             background: rgba(0, 0, 0, 100);
@@ -62,7 +58,6 @@ class UIStyles:
             padding: 2px;
         }
     """
-
     MODE_SELECT = """
         QComboBox { 
             background: rgba(0, 0, 0, 100); 
@@ -72,6 +67,20 @@ class UIStyles:
             padding: 2px 10px;
         }
         QComboBox QAbstractItemView { background-color: #2b2b2b; color: white; }
+    """
+    FILE_MENU = """
+        QToolButton {
+            background: rgba(0, 0, 0, 100);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 30);
+            padding: 4px 10px;
+        }
+        QToolButton:hover {
+            background: rgba(255, 255, 255, 30);
+        }
+        QToolButton::menu-indicator {
+            image: none;
+        }
     """
 
 def create_btn(text, callback, is_close=False, width=32):
@@ -128,9 +137,38 @@ class CustomTitleBar(QToolBar):
         self.spacer_action = None
         self.circles = None
         self.btn_set_scale = None
+        self.file_button = None
+        self.action_save = None
+        self.action_load = None
         self.init_ui()
 
     def init_ui(self):
+        self.file_button = QToolButton()
+        self.file_button.setText("File")
+        self.file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.file_button.setStyleSheet(UIStyles.FILE_MENU)
+
+        file_menu = QMenu(self.file_button)
+        file_menu.setStyleSheet("""
+            QMenu {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 30);
+            }
+            QMenu::item:selected {
+                background-color: rgba(255, 255, 255, 30);
+            }
+        """)
+
+        self.action_save = file_menu.addAction("Save")
+        self.action_load = file_menu.addAction("Load")
+
+        self.file_button.setMenu(file_menu)
+        self.addWidget(self.file_button)
+        self.addSeparator()
+
+        # 1. Left Side Actions (existing code continues...)
+        self.opacity_spin = QSpinBox()
         # 1. Left Side Actions
         self.opacity_spin = QSpinBox()
         self.opacity_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
@@ -186,7 +224,6 @@ class DrawingArea(QWidget):
         self.circles = {}
         self.scale_value = 1
         self.is_scale_mode = False
-        # self.load_from_file("save.json")
 
     def load_from_file(self, file_path: str):
         with open(file_path) as user_file:
@@ -199,18 +236,17 @@ class DrawingArea(QWidget):
 
         for json_circle_id, circle_data in json_data["circles"].items():
             json_circle_id = int(json_circle_id)
-            circle_id = json_circle_id
             radius = circle_data["radius"]
             sb = MySpinBox(self)
             sb_value = radius * self.scale_value
             sb.setValue(sb_value)
-            sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
+            sb.valueChanged.connect(lambda value: self.circle_resize(json_circle_id, value))
 
             point = circle_data["point"]
             qpoint = QPoint(int(point["x"]), int(point["y"]))
             self.circles[json_circle_id] = [QPoint(qpoint), sb, radius]
 
-            delete_callback = lambda _=None, cid=circle_id, spinbox=sb : self.delete_circle_callback(cid, spinbox)
+            delete_callback = lambda _=None, cid=json_circle_id, spinbox=sb : self.delete_circle_callback(cid, spinbox)
             btn = create_btn("✕", delete_callback, is_close=False)
             btn.clicked.connect(btn.deleteLater)
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
@@ -264,10 +300,7 @@ class DrawingArea(QWidget):
         self.update()
 
     def delete_circle_callback(self, circle_id, sb):
-        print("id:", circle_id)
-        print(self.circles)
         del self.circles[circle_id]
-        print(self.circles)
         sb.deleteLater()
         self.update()
 
