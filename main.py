@@ -3,6 +3,7 @@ import json
 import math
 import sys
 from copy import deepcopy
+from typing import Any
 
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
@@ -224,6 +225,7 @@ class DrawingArea(QWidget):
         self.circles = {}
         self.scale_value = 1
         self.is_scale_mode = False
+        self.load_from_file("save.json")
 
     def load_from_file(self, file_path: str):
         with open(file_path) as user_file:
@@ -252,6 +254,17 @@ class DrawingArea(QWidget):
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
             title_bar.insertWidget(x_action, sb)
         self.update()
+
+    def save_to_file(self, file_path: str):
+        json_data: dict[str, Any] = {"scale": self.scale_value}
+        my_circles: dict[Any, Any] = {}
+        for circle_id, circle_data in self.circles.items():
+            point = {"x": circle_data[0].x(), "y": circle_data[0].y()}
+            radius = circle_data[2]
+            my_circles[str(circle_id)] = {"point": point, "radius": radius}
+        json_data["circles"] = my_circles
+        with open(file_path, 'w') as f:
+            json.dump(json_data, f, indent=4)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -283,6 +296,7 @@ class DrawingArea(QWidget):
 
             self.id += 1
             self.update()
+            self.save_to_file("save.json")
 
         elif event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode:
             user_value = 0.5
@@ -293,7 +307,6 @@ class DrawingArea(QWidget):
                 sb.setValue(original_r * self.scale_value)
             self.is_scale_mode = False
             self.update()
-            print(self.scale_value)
         self.is_drawing = False
 
     def circle_resize(self, circle_id, sb_value):
