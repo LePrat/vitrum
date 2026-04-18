@@ -8,8 +8,8 @@ from typing import Any
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
                                QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox, QToolButton, QMenu)
-from PySide6.QtCore import Qt, QPoint, QLocale, Slot, Signal
+                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox, QToolButton, QMenu, QFileDialog)
+from PySide6.QtCore import Qt, QPoint, QLocale, Slot, Signal, QStandardPaths
 from pynput import keyboard
 
 
@@ -163,6 +163,8 @@ class CustomTitleBar(QToolBar):
 
         self.action_save = file_menu.addAction("Save")
         self.action_load = file_menu.addAction("Load")
+        self.action_save.triggered.connect(self.on_save_clicked)
+        self.action_load.triggered.connect(self.on_load_clicked)
 
         self.file_button.setMenu(file_menu)
         self.addWidget(self.file_button)
@@ -192,6 +194,26 @@ class CustomTitleBar(QToolBar):
         self.addWidget(self.btn_set_scale)
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
+
+    def on_save_clicked(self):
+        print("SAVE")
+
+    def on_load_clicked(self):
+        documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+        drawing_area: DrawingArea = self.parent_window.content_area
+
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle("Load Vitrum project")
+
+        dialog.setDirectory(documents_dir)
+        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setViewMode(QFileDialog.ViewMode.Detail)
+        if dialog.exec():
+            selected_files = dialog.selectedFiles()
+            file_path = selected_files[0]
+            drawing_area.load_from_file(file_path)
+
 
 
     def update_background_opacity(self, value):
@@ -225,7 +247,6 @@ class DrawingArea(QWidget):
         self.circles = {}
         self.scale_value = 1
         self.is_scale_mode = False
-        self.load_from_file("save.json")
 
     def load_from_file(self, file_path: str):
         with open(file_path) as user_file:
@@ -296,7 +317,6 @@ class DrawingArea(QWidget):
 
             self.id += 1
             self.update()
-            self.save_to_file("save.json")
 
         elif event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode:
             user_value = 0.5
