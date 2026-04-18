@@ -231,7 +231,7 @@ class DrawingArea(QWidget):
         json_data: dict = json.loads(file_contents)
 
         self.id = int(max(json_data["circles"], key=int)) + 1
-        self.scale_value = int(json_data["scale"])
+        self.scale_value = float(json_data["scale"])
         title_bar = self.parent_window.title_bar
 
         for json_circle_id, circle_data in json_data["circles"].items():
@@ -293,6 +293,7 @@ class DrawingArea(QWidget):
                 sb.setValue(original_r * self.scale_value)
             self.is_scale_mode = False
             self.update()
+            print(self.scale_value)
         self.is_drawing = False
 
     def circle_resize(self, circle_id, sb_value):
