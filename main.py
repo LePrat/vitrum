@@ -107,6 +107,7 @@ class MySpinBox(QDoubleSpinBox):
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.setStyleSheet(UIStyles.OPACITY_TOOL)
         self.drawing_area = drawing_area
+        self.btn = None
 
     def focusInEvent(self, event):
         super().focusInEvent(event)
@@ -281,7 +282,7 @@ class DrawingArea(QWidget):
             for circle_id, circle_data in self.circles.items():
                 _, spin_box, _ = circle_data
                 spin_box.deleteLater()
-                print(circle_data)
+                spin_box.btn.deleteLater()
             self.circles = {}
 
     def load_from_file(self, file_path: str):
@@ -304,11 +305,12 @@ class DrawingArea(QWidget):
 
             point = circle_data["point"]
             qpoint = QPoint(int(point["x"]), int(point["y"]))
-            self.circles[json_circle_id] = [QPoint(qpoint), sb, radius]
 
             delete_callback = lambda _=None, cid=json_circle_id, spinbox=sb : self.delete_circle_callback(cid, spinbox)
+            self.circles[json_circle_id] = [QPoint(qpoint), sb, radius]
             btn = create_btn("✕", delete_callback, is_close=False)
             btn.clicked.connect(btn.deleteLater)
+            sb.btn = btn
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
             title_bar.insertWidget(x_action, sb)
         self.update()
@@ -346,9 +348,10 @@ class DrawingArea(QWidget):
             sb.setValue(sb_value)
             sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
 
-            self.circles[self.id] = [self.start_point, sb, radius]
             btn = create_btn("✕", lambda: self.delete_circle_callback(circle_id, sb), is_close=False)
             btn.clicked.connect(btn.deleteLater)
+            sb.btn = btn
+            self.circles[self.id] = [self.start_point, sb, radius]
             x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
             title_bar.insertWidget(x_action, sb)
 
