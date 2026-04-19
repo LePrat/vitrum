@@ -119,7 +119,7 @@ class MySpinBox(QDoubleSpinBox):
         self.drawing_area.update()
 
     def __repr__(self):
-        return str(self.value())
+        return f"MySpinBox({str(self.value())})"
 
 
 # --- Custom Widgets ---
@@ -139,8 +139,10 @@ class CustomTitleBar(QToolBar):
         self.circles = None
         self.btn_set_scale = None
         self.file_button = None
+        self.action_save_as = None
         self.action_save = None
         self.action_load = None
+        self.current_file_name = ""
         self.init_ui()
 
     def init_ui(self):
@@ -161,8 +163,10 @@ class CustomTitleBar(QToolBar):
             }
         """)
 
+        self.action_load = file_menu.addAction("Open...")
+        self.action_save_as = file_menu.addAction("Save As...")
         self.action_save = file_menu.addAction("Save")
-        self.action_load = file_menu.addAction("Load")
+        self.action_save_as.triggered.connect(self.on_save_as_clicked)
         self.action_save.triggered.connect(self.on_save_clicked)
         self.action_load.triggered.connect(self.on_load_clicked)
 
@@ -195,8 +199,31 @@ class CustomTitleBar(QToolBar):
         self.addWidget(self.btn_full)
         self.addWidget(self.btn_close)
 
+    def on_save_as_clicked(self):
+        documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+        drawing_area: DrawingArea = self.parent_window.content_area
+
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle("Save Vitrum project")
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+
+        dialog.setDirectory(documents_dir)
+        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setDefaultSuffix("json")
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        dialog.setViewMode(QFileDialog.ViewMode.Detail)
+        if dialog.exec():
+            selected_files = dialog.selectedFiles()
+            file_path = selected_files[0]
+            drawing_area.save_to_file(file_path)
+            self.current_file_name = file_path
+
     def on_save_clicked(self):
-        print("SAVE")
+        drawing_area: DrawingArea = self.parent_window.content_area
+        if self.current_file_name:
+            drawing_area.save_to_file(self.current_file_name)
+        else:
+            self.on_save_as_clicked()
 
     def on_load_clicked(self):
         documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
@@ -213,6 +240,7 @@ class CustomTitleBar(QToolBar):
             selected_files = dialog.selectedFiles()
             file_path = selected_files[0]
             drawing_area.load_from_file(file_path)
+            self.current_file_name = file_path
 
 
 
@@ -248,7 +276,16 @@ class DrawingArea(QWidget):
         self.scale_value = 1
         self.is_scale_mode = False
 
+    def delete_circles(self):
+        if self.circles:
+            for circle_id, circle_data in self.circles.items():
+                _, spin_box, _ = circle_data
+                spin_box.deleteLater()
+                print(circle_data)
+            self.circles = {}
+
     def load_from_file(self, file_path: str):
+        self.delete_circles()
         with open(file_path) as user_file:
             file_contents = user_file.read()
         json_data: dict = json.loads(file_contents)
