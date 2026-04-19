@@ -59,15 +59,14 @@ class UIStyles:
             padding: 2px;
         }
     """
-    MODE_SELECT = """
-        QComboBox { 
-            background: rgba(0, 0, 0, 100); 
-            color: white; 
+    CIRCLE_SPINBOX = """
+        QDoubleSpinBox {
+            background: rgba(0, 0, 0, 100);
+            color: white;
             border: 1px solid rgba(255, 255, 255, 30);
             border-radius: 4px;
-            padding: 2px 10px;
+            padding: 2px;
         }
-        QComboBox QAbstractItemView { background-color: #2b2b2b; color: white; }
     """
     FILE_MENU = """
         QToolButton {
@@ -105,7 +104,7 @@ class MySpinBox(QDoubleSpinBox):
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.setRange(0, 10000)
         self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.setStyleSheet(UIStyles.OPACITY_TOOL)
+        self.setStyleSheet(UIStyles.CIRCLE_SPINBOX)
         self.drawing_area = drawing_area
         self.btn = None
 
