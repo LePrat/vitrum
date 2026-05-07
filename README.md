@@ -12,6 +12,7 @@
 ![image]()
 
 ## Install
+### 1. Download the project
 To get started, download the project files using one of the methods below:
 
 #### Option A: Download ZIP (Easiest)
@@ -23,6 +24,30 @@ If you have Git installed and want to pull updates easily, run the following com
 ```Bash
 git clone https://github.com/LePrat/vitrum.git
 ```
+
+### 2. Install UV
+The project uses python and its most stable installer : [UV](https://docs.astral.sh/uv/getting-started/installation/#__tabbed_1_2)
+
+#### Windows
+In powershell
+```Bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+#### Linux / macOS
+```Bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### 3. Run it!
+#### Windows
+Just double click `run.vbs` and after installing the necessary packages for the first time, vitrum should appear.
+
+#### Linux / macOS
+```Bash
+uv run main.py
+```
+
 
 ## Usage
 
