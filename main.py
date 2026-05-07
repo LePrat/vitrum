@@ -1,406 +1,12 @@
 #!/usr/bin/env -S uv run --script
-import json
-import math
 import sys
-from copy import deepcopy
-from typing import Any
-
-from PySide6.QtGui import QPainter, QColor, QPen
-from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton,
-                               QVBoxLayout, QWidget, QSizeGrip,
-                               QToolBar, QSizePolicy, QSpinBox, QDoubleSpinBox, QToolButton, QMenu, QFileDialog)
-from PySide6.QtCore import Qt, QPoint, QLocale, Slot, Signal, QStandardPaths
 from pynput import keyboard
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSizeGrip
+from PySide6.QtCore import Qt, QLocale, Slot, Signal
 
-
-# --- Configuration & Styles ---
-class UIStyles:
-    TRANSPARENCY = int(50 * 255 / 100)
-    BG_COLOR = f"rgba(30, 30, 30, {TRANSPARENCY})"
-    RADIUS = "12px"
-    MAIN_CONTAINER = f"""
-        QWidget#MainContainer {{
-            background-color: {BG_COLOR};
-            border-radius: {RADIUS};
-            border: 1px solid rgba(255, 255, 255, 40);
-        }}
-    """
-    TOOLBAR = f"""
-    QToolBar {{
-        background: rgba(255, 255, 255, 70);
-        border-bottom: 1px solid rgba(255, 255, 255, 20);
-        border-top-left-radius: {RADIUS};
-        border-top-right-radius: {RADIUS};
-        padding: 4px;
-    }}
-    
-    QToolBar > QWidget {{
-        height: 24px;
-        max-height: 24px;
-        min-height: 24px;
-    }}
-    
-    QToolButton {{ 
-        color: white; 
-        padding: 5px; 
-    }}
-    
-    QToolButton:hover {{ 
-        background: rgba(255, 255, 255, 30); 
-        border-radius: 4px; 
-    }}
-    """
-    OPACITY_TOOL = """
-        QSpinBox {
-            background: rgba(0, 0, 0, 100);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 30);
-            border-radius: 4px;
-            padding: 2px;
-        }
-    """
-    CIRCLE_SPINBOX = """
-        QDoubleSpinBox {
-            background: rgba(0, 0, 0, 100);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 30);
-            border-radius: 4px;
-            padding: 2px;
-        }
-    """
-    FILE_MENU = """
-        QToolButton {
-            background: rgba(0, 0, 0, 100);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 30);
-            padding: 4px 10px;
-        }
-        QToolButton:hover {
-            background: rgba(255, 255, 255, 30);
-        }
-        QToolButton::menu-indicator {
-            image: none;
-        }
-    """
-
-def create_btn(text, callback, is_close=False, width=32):
-    btn = QPushButton(text)
-    btn.setFixedSize(width, 28)
-    hover_color = "#e81123" if is_close else "rgba(255, 255, 255, 40)"
-    btn.setStyleSheet(f"""
-        QPushButton {{ background: transparent; color: white; border-radius: 4px; font-size: 14px; }}
-        QPushButton:hover {{ background: {hover_color}; }}
-    """)
-    if callback is not None:
-        btn.clicked.connect(callback)
-    return btn
-
-
-class MySpinBox(QDoubleSpinBox):
-    def __init__(self, drawing_area: DrawingArea, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setDecimals(5)
-        self.is_focused = False
-        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.setRange(0, 10000)
-        self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.setStyleSheet(UIStyles.CIRCLE_SPINBOX)
-        self.drawing_area = drawing_area
-        self.btn = None
-
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        self.is_focused = True
-        self.drawing_area.update()
-
-    def focusOutEvent(self, event):
-        super().focusOutEvent(event)
-        self.is_focused = False
-        self.drawing_area.update()
-
-    def __repr__(self):
-        return f"MySpinBox({str(self.value())})"
-
-
-# --- Custom Widgets ---
-class CustomTitleBar(QToolBar):
-    """A specialized toolbar that handles window movement and controls."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.mode_select = None
-        self.opacity_spin = None
-        self.btn_close = None
-        self.btn_full = None
-        self.parent_window: ModernWindow = parent
-        self.setMovable(False)
-        self.setStyleSheet(UIStyles.TOOLBAR)
-        self.spacer_action = None
-        self.circles = None
-        self.btn_set_scale = None
-        self.file_button = None
-        self.action_save_as = None
-        self.action_save = None
-        self.action_load = None
-        self.current_file_name = ""
-        self.init_ui()
-
-    def init_ui(self):
-        self.file_button = QToolButton()
-        self.file_button.setText("File")
-        self.file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.file_button.setStyleSheet(UIStyles.FILE_MENU)
-
-        file_menu = QMenu(self.file_button)
-        file_menu.setStyleSheet("""
-            QMenu {
-                background-color: #2b2b2b;
-                color: white;
-                border: 1px solid rgba(255, 255, 255, 30);
-            }
-            QMenu::item:selected {
-                background-color: rgba(255, 255, 255, 30);
-            }
-        """)
-
-        self.action_load = file_menu.addAction("Open...")
-        self.action_save_as = file_menu.addAction("Save As...")
-        self.action_save = file_menu.addAction("Save")
-        self.action_save_as.triggered.connect(self.on_save_as_clicked)
-        self.action_save.triggered.connect(self.on_save_clicked)
-        self.action_load.triggered.connect(self.on_load_clicked)
-
-        self.file_button.setMenu(file_menu)
-        self.addWidget(self.file_button)
-        self.addSeparator()
-
-        # 1. Left Side Actions (existing code continues...)
-        self.opacity_spin = QSpinBox()
-        # 1. Left Side Actions
-        self.opacity_spin = QSpinBox()
-        self.opacity_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.opacity_spin.setRange(0, 100)
-        self.opacity_spin.setSuffix("%")
-        self.opacity_spin.setValue(50)
-        self.opacity_spin.setStyleSheet(UIStyles.OPACITY_TOOL)
-        self.opacity_spin.valueChanged.connect(self.update_background_opacity)
-        self.addWidget(self.opacity_spin)
-        self.addSeparator()
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.spacer_action = self.addWidget(spacer)
-
-    # 3. Window Buttons
-        self.btn_full = create_btn("⛶", self.parent_window.toggle_fullscreen)
-        self.btn_close = create_btn("✕", self.parent_window.close, is_close=True)
-        self.btn_set_scale = create_btn("Set scale", self.update_scale, is_close=False, width=70)
-
-        self.addWidget(self.btn_set_scale)
-        self.addWidget(self.btn_full)
-        self.addWidget(self.btn_close)
-
-    def on_save_as_clicked(self):
-        documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
-        drawing_area: DrawingArea = self.parent_window.content_area
-
-        dialog = QFileDialog(self)
-        dialog.setWindowTitle("Save Vitrum project")
-        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-
-        dialog.setDirectory(documents_dir)
-        dialog.setNameFilter("JSON Files (*.json)")
-        dialog.setDefaultSuffix("json")
-        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        dialog.setViewMode(QFileDialog.ViewMode.Detail)
-        if dialog.exec():
-            selected_files = dialog.selectedFiles()
-            file_path = selected_files[0]
-            drawing_area.save_to_file(file_path)
-            self.current_file_name = file_path
-
-    def on_save_clicked(self):
-        drawing_area: DrawingArea = self.parent_window.content_area
-        if self.current_file_name:
-            drawing_area.save_to_file(self.current_file_name)
-        else:
-            self.on_save_as_clicked()
-
-    def on_load_clicked(self):
-        documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
-        drawing_area: DrawingArea = self.parent_window.content_area
-
-        dialog = QFileDialog(self)
-        dialog.setWindowTitle("Load Vitrum project")
-
-        dialog.setDirectory(documents_dir)
-        dialog.setNameFilter("JSON Files (*.json)")
-        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        dialog.setViewMode(QFileDialog.ViewMode.Detail)
-        if dialog.exec():
-            selected_files = dialog.selectedFiles()
-            file_path = selected_files[0]
-            drawing_area.load_from_file(file_path)
-            self.current_file_name = file_path
-
-
-
-    def update_background_opacity(self, value):
-        """
-        Updates only the alpha channel of the background
-        while preserving the rest of the UI design.
-        """
-        alpha = int(value * 255 / 100)
-        new_style = f"""
-            QWidget#MainContainer {{
-                background-color: rgba(30, 30, 30, {alpha});
-                border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 40);
-            }}
-        """
-        self.parent_window.main_container.setStyleSheet(new_style)
-
-    def update_scale(self):
-        drawing_area: DrawingArea = self.parent_window.content_area
-        drawing_area.is_scale_mode = True
-
-
-class DrawingArea(QWidget):
-    def __init__(self, parent: ModernWindow):
-        super().__init__()
-        self.parent_window: ModernWindow = parent
-        self.start_point = QPoint()
-        self.end_point = QPoint()
-        self.is_drawing = False
-        self.id = 1
-        self.circles = {}
-        self.scale_value = 1
-        self.is_scale_mode = False
-
-    def delete_circles(self):
-        if self.circles:
-            for circle_id, circle_data in self.circles.items():
-                _, spin_box, _ = circle_data
-                spin_box.deleteLater()
-                spin_box.btn.deleteLater()
-            self.circles = {}
-
-    def load_from_file(self, file_path: str):
-        self.delete_circles()
-        with open(file_path) as user_file:
-            file_contents = user_file.read()
-        json_data: dict = json.loads(file_contents)
-
-        self.id = int(max(json_data["circles"], key=int)) + 1
-        self.scale_value = float(json_data["scale"])
-        title_bar = self.parent_window.title_bar
-
-        for json_circle_id, circle_data in json_data["circles"].items():
-            json_circle_id = int(json_circle_id)
-            radius = circle_data["radius"]
-            sb = MySpinBox(self)
-            sb_value = radius * self.scale_value
-            sb.setValue(sb_value)
-            sb.valueChanged.connect(lambda value: self.circle_resize(json_circle_id, value))
-
-            point = circle_data["point"]
-            qpoint = QPoint(int(point["x"]), int(point["y"]))
-
-            delete_callback = lambda _=None, cid=json_circle_id, spinbox=sb : self.delete_circle_callback(cid, spinbox)
-            self.circles[json_circle_id] = [QPoint(qpoint), sb, radius]
-            btn = create_btn("✕", delete_callback, is_close=False)
-            btn.clicked.connect(btn.deleteLater)
-            sb.btn = btn
-            x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
-            title_bar.insertWidget(x_action, sb)
-        self.update()
-
-    def save_to_file(self, file_path: str):
-        json_data: dict[str, Any] = {"scale": self.scale_value}
-        my_circles: dict[Any, Any] = {}
-        for circle_id, circle_data in self.circles.items():
-            point = {"x": circle_data[0].x(), "y": circle_data[0].y()}
-            radius = circle_data[2]
-            my_circles[str(circle_id)] = {"point": point, "radius": radius}
-        json_data["circles"] = my_circles
-        with open(file_path, 'w') as f:
-            json.dump(json_data, f, indent=4)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.start_point = event.position().toPoint()
-            self.end_point = self.start_point
-            self.is_drawing = True
-
-    def mouseMoveEvent(self, event):
-        if self.is_drawing:
-            self.end_point = event.position().toPoint()
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        title_bar = self.parent_window.title_bar
-        if event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode is False:
-            circle_id = deepcopy(self.id)
-            radius = math.dist((self.start_point.x(), self.start_point.y()),
-                                   (self.end_point.x(), self.end_point.y()))
-            sb = MySpinBox(self)
-            sb_value = radius * self.scale_value
-            sb.setValue(sb_value)
-            sb.valueChanged.connect(lambda value: self.circle_resize(circle_id, value))
-
-            btn = create_btn("✕", lambda: self.delete_circle_callback(circle_id, sb), is_close=False)
-            btn.clicked.connect(btn.deleteLater)
-            sb.btn = btn
-            self.circles[self.id] = [self.start_point, sb, radius]
-            x_action = title_bar.insertWidget(title_bar.spacer_action, btn)
-            title_bar.insertWidget(x_action, sb)
-
-            self.id += 1
-            self.update()
-
-        elif event.button() == Qt.MouseButton.LeftButton and self.is_scale_mode:
-            user_value = 0.5
-            length_measured = math.dist((self.start_point.x(), self.start_point.y()),
-                                        (self.end_point.x(), self.end_point.y()))
-            self.scale_value = user_value / length_measured
-            for center, sb, original_r in self.circles.values():
-                sb.setValue(original_r * self.scale_value)
-            self.is_scale_mode = False
-            self.update()
-        self.is_drawing = False
-
-    def circle_resize(self, circle_id, sb_value):
-        self.circles[circle_id][2] =  sb_value / self.scale_value
-        self.update()
-
-    def delete_circle_callback(self, circle_id, sb):
-        del self.circles[circle_id]
-        sb.deleteLater()
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(0, 0, 0), 2))
-
-        for center, sb, original_r  in self.circles.values():
-            current_r = sb.value() / self.scale_value
-            if sb.is_focused:
-                painter.setPen(QPen(QColor(204, 204, 0), 2))
-                painter.drawEllipse(center, current_r, current_r)
-                painter.drawPoint(center)
-                painter.setPen(QPen(QColor(0, 0, 0), 2))
-            else:
-                painter.setPen(QPen(QColor(0, 0, 0), 2))
-                painter.drawEllipse(center, current_r, current_r)
-                painter.drawPoint(center)
-
-        if self.is_drawing and self.is_scale_mode:
-            painter.drawLine(self.start_point, self.end_point)
-
-        elif self.is_drawing:
-            r = math.dist((self.start_point.x(), self.start_point.y()),
-                      (self.end_point.x(), self.end_point.y()))
-            painter.drawEllipse(self.start_point, r, r)
+from vitrum.CustomTitleBar import CustomTitleBar
+from vitrum.DrawingArea import DrawingArea
+from vitrum.ui import UIStyles
 
 
 class ModernWindow(QMainWindow):
@@ -418,7 +24,7 @@ class ModernWindow(QMainWindow):
         self._drag_pos = None
         self._locked = False
         self._normal_flags = None
-        self._toggle_lock_signal.connect(self.toggle_lock)  # signal → slot, always on main thread
+        self._toggle_lock_signal.connect(self.toggle_lock)
         self._start_hotkey_listener()
 
         self.setup_window_properties()
@@ -440,7 +46,6 @@ class ModernWindow(QMainWindow):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # Custom Toolbar
         self.title_bar = CustomTitleBar(self)
         self.main_layout.addWidget(self.title_bar)
         self.content_area = QWidget()
@@ -450,7 +55,7 @@ class ModernWindow(QMainWindow):
 
     def _start_hotkey_listener(self):
         def on_activate():
-            self._toggle_lock_signal.emit()  # safe to emit from any thread
+            self._toggle_lock_signal.emit()
 
         self._hotkey_listener = keyboard.GlobalHotKeys({
             '<ctrl>+<alt>+m': on_activate
@@ -486,10 +91,10 @@ class ModernWindow(QMainWindow):
     def lock_window(self):
         self._normal_flags = self.windowFlags()
         flags = (
-                Qt.WindowType.FramelessWindowHint  # no title bar / borders
-                | Qt.WindowType.WindowStaysOnTopHint  # always in foreground
-                | Qt.WindowType.WindowTransparentForInput  # <-- the magic: all input ignored
-                | Qt.WindowType.Tool  # keeps it out of taskbar
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.WindowTransparentForInput
+                | Qt.WindowType.Tool
         )
         self.setWindowFlags(flags)
         self.show()
@@ -510,7 +115,6 @@ class ModernWindow(QMainWindow):
             self.lock_window()
 
 if __name__ == "__main__":
-    # TODO save feature
     QLocale.setDefault(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
     app = QApplication(sys.argv)
     window = ModernWindow()
