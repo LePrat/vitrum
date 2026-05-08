@@ -9,7 +9,7 @@
 
 ## Preview
 
-![image]()
+![image](https://github.com/LePrat/vitrum/blob/main/data/demo.gif)
 
 ## Install
 ### 1. Download the project
